@@ -74,6 +74,52 @@ void DrawTriangle(tContext *sContext, int x1, int y1, int x2, int y2, int x3, in
     GrLineDraw(sContext, x3, y3, x1, y1);
 }
 
+
+void FillTriangle(tContext *sContext, int x1, int y1, int x2, int y2, int x3, int y3) {
+    float d1 = (float) sqrt((pow((y2-y1),2))+(pow((x2-x1),2)));
+    float d2 = (float) sqrt((pow((y3-y2),2))+(pow((x3-x2),2)));
+    float d3 = (float) sqrt((pow((y1-y3),2))+(pow((x1-x3),2)));
+    GrContextForegroundSet(sContext, ClrWhite);
+
+    float x_start = 0;
+    float y_start = 0;
+    float x_end = 0;
+    float yJump = 0;
+    float x_top = 0;
+    float y_top = 0;
+
+    if(((d1<d2)||(d1=d2))&&((d1<d2)||(d1=d2))){
+        x_start = (float)x2;
+        y_start = (float)y2;
+        x_end = (float)x1;
+        yJump = (float)(y2-y1)/(x2-x1)/1;
+        x_top = (float)x3;
+        y_top = (float)y3;
+    } //the first side is the shortest
+    else if((d2<d3)||(d2=d3)){
+        x_start = (float)x3;
+        y_start = (float)y3;
+        x_end = (float)x2;
+        yJump = (float)(y3-y2)/(x3-x2)/1;
+        x_top = (float)x1;
+        y_top = (float)y1;
+    } //the second side is the shortest
+    else{
+        x_start = (float)x1;
+        y_start = (float)y1;
+        x_end = (float)x3;
+        yJump = (float)(y1-y3)/(x1-x3)/1;
+        x_top = (float)x2;
+        y_top = (float)y2;
+    } // the third side is shortest
+    while(x_start>=x_end){
+        GrLineDraw(sContext, x_top, y_top, x_start, y_start);
+        x_start-=1;
+        y_start-=yJump;
+    }
+}
+
+
 void _clear_screen(tContext *sContext){
     tRectangle sRect;
     sRect.i16XMin = 0;
@@ -164,6 +210,8 @@ matProj.m[3][2] = (-fFar * fNear) / (fFar - fNear);
 matProj.m[2][3] = 1.0f;
 matProj.m[3][3] = 0.0f;
 
+vec3d vCamera = {0, 0 ,0};
+
 float fElapsedTime = 0.1;
 
 int fps = 10000000;
@@ -210,26 +258,49 @@ while(true){
 			triTranslated.p[1].z = triRotatedZX.p[1].z + 3.0f;
 			triTranslated.p[2].z = triRotatedZX.p[2].z + 3.0f;
 
-			// Project triangles from 3D --> 2D
-			MultiplyMatrixVector(&triTranslated.p[0], &triProjected.p[0], &matProj);
-			MultiplyMatrixVector(&triTranslated.p[1], &triProjected.p[1], &matProj);
-			MultiplyMatrixVector(&triTranslated.p[2], &triProjected.p[2], &matProj);
 
-			// Scale into view
-			triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
-			triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
-			triProjected.p[2].x += 1.0f; triProjected.p[2].y += 1.0f;
-			triProjected.p[0].x *= 0.5f * (float)MAXW;
-			triProjected.p[0].y *= 0.5f * (float)MAXH;
-			triProjected.p[1].x *= 0.5f * (float)MAXW;
-			triProjected.p[1].y *= 0.5f * (float)MAXH;
-			triProjected.p[2].x *= 0.5f * (float)MAXW;
-			triProjected.p[2].y *= 0.5f * (float)MAXH;
+            // Use Cross-Product to get surface normal
+			vec3d normal, line1, line2;
+			line1.x = triTranslated.p[1].x - triTranslated.p[0].x;
+			line1.y = triTranslated.p[1].y - triTranslated.p[0].y;
+			line1.z = triTranslated.p[1].z - triTranslated.p[0].z;
 
-			// Rasterize triangle
-			DrawTriangle(&sContext, triProjected.p[0].x, triProjected.p[0].y,
-				triProjected.p[1].x, triProjected.p[1].y,
-				triProjected.p[2].x, triProjected.p[2].y);
+			line2.x = triTranslated.p[2].x - triTranslated.p[0].x;
+			line2.y = triTranslated.p[2].y - triTranslated.p[0].y;
+			line2.z = triTranslated.p[2].z - triTranslated.p[0].z;
+
+			normal.x = line1.y * line2.z - line1.z * line2.y;
+			normal.y = line1.z * line2.x - line1.x * line2.z;
+			normal.z = line1.x * line2.y - line1.y * line2.x;
+
+			// It's normally normal to normalise the normal
+			float l = sqrtf(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
+			normal.x /= l; normal.y /= l; normal.z /= l;
+
+            if(normal.x * (triTranslated.p[0].x - vCamera.x) + 
+			   normal.y * (triTranslated.p[0].y - vCamera.y) +
+			   normal.z * (triTranslated.p[0].z - vCamera.z) < 0.0f){
+                // Project triangles from 3D --> 2D
+                MultiplyMatrixVector(&triTranslated.p[0], &triProjected.p[0], &matProj);
+                MultiplyMatrixVector(&triTranslated.p[1], &triProjected.p[1], &matProj);
+                MultiplyMatrixVector(&triTranslated.p[2], &triProjected.p[2], &matProj);
+
+                // Scale into view
+                triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
+                triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
+                triProjected.p[2].x += 1.0f; triProjected.p[2].y += 1.0f;
+                triProjected.p[0].x *= 0.5f * (float)MAXW;
+                triProjected.p[0].y *= 0.5f * (float)MAXH;
+                triProjected.p[1].x *= 0.5f * (float)MAXW;
+                triProjected.p[1].y *= 0.5f * (float)MAXH;
+                triProjected.p[2].x *= 0.5f * (float)MAXW;
+                triProjected.p[2].y *= 0.5f * (float)MAXH;
+
+                // Rasterize triangle
+                DrawTriangle(&sContext, triProjected.p[0].x, triProjected.p[0].y,
+                    triProjected.p[1].x, triProjected.p[1].y,
+                    triProjected.p[2].x, triProjected.p[2].y);
+            }
 
 		}
         fpsI = 0;
