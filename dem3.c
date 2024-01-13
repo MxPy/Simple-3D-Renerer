@@ -348,7 +348,6 @@ void createCube(mesh* meshCube, float x, float y, float z, float size) {
     meshCube->tris[meshCube->counter++] = (struct triangle){{x + size, y, z + size, 1, x, y, z + size, 1, x, y, z, 1}};
     meshCube->tris[meshCube->counter++] = (struct triangle){{x + size, y, z + size, 1, x, y, z, 1, x + size, y, z, 1}};
 }
-
 //ENDREGION
 
 
@@ -395,7 +394,10 @@ float fThetaX;
 float fThetaY;
 
 
-createCube(&meshCube, 0.0f, 0.0f, 1.0f, 1.0f);
+createCube(&meshCube, 0.0f, 0.0f, 3.0f, 0.5f);
+
+
+
 
 float fNear = 0.1f;
 float fFar = 1000.0f;
@@ -511,26 +513,29 @@ while(true){
 
 
                 // Use Cross-Product to get surface normal
-                vec3d normal, line1, line2;
-                line1.x = triTranslated.p[1].x - triTranslated.p[0].x;
-                line1.y = triTranslated.p[1].y - triTranslated.p[0].y;
-                line1.z = triTranslated.p[1].z - triTranslated.p[0].z;
+                vec3d normal, line1, line2, vCameraRay;
+                line1 = Vector_Sub(&triTranslated.p[1], &triTranslated.p[0]);
+			    line2 = Vector_Sub(&triTranslated.p[2], &triTranslated.p[0]);
+                normal = Vector_CrossProduct(&line1, &line2);
 
-                line2.x = triTranslated.p[2].x - triTranslated.p[0].x;
-                line2.y = triTranslated.p[2].y - triTranslated.p[0].y;
-                line2.z = triTranslated.p[2].z - triTranslated.p[0].z;
+                normal = Vector_Normalise(&normal);
+			    // Get Ray from triangle to camera
+			    vCameraRay = Vector_Sub(&triTranslated.p[0], &vCamera);
 
-                normal.x = line1.y * line2.z - line1.z * line2.y;
-                normal.y = line1.z * line2.x - line1.x * line2.z;
-                normal.z = line1.x * line2.y - line1.y * line2.x;
+                //line1.x = triTranslated.p[1].x - triTranslated.p[0].x;
+                //line1.y = triTranslated.p[1].y - triTranslated.p[0].y;
+                //line1.z = triTranslated.p[1].z - triTranslated.p[0].z;
+
+                //line2.x = triTranslated.p[2].x - triTranslated.p[0].x;
+                //line2.y = triTranslated.p[2].y - triTranslated.p[0].y;
+                //line2.z = triTranslated.p[2].z - triTranslated.p[0].z;
+
+                //normal.x = line1.y * line2.z - line1.z * line2.y;
+                //normal.y = line1.z * line2.x - line1.x * line2.z;
+                //normal.z = line1.x * line2.y - line1.y * line2.x;
 
                 // It's normally normal to normalise the normal
-                float l = sqrtf(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
-                normal.x /= l; normal.y /= l; normal.z /= l;
-
-                if(normal.x * (triTranslated.p[0].x - vCamera.x) + 
-                normal.y * (triTranslated.p[0].y - vCamera.y) +
-                normal.z * (triTranslated.p[0].z - vCamera.z) < 0.0f){
+                if (Vector_DotProduct(&normal, &vCameraRay) < 0.0f){
                     // Project triangles from 3D --> 2D
                     MultiplyMatrixVector(&triTranslated.p[0], &triViewd.p[0], &matView);
                     MultiplyMatrixVector(&triTranslated.p[1], &triViewd.p[1], &matView);
@@ -538,7 +543,7 @@ while(true){
 
                     int nClippedTriangles = 0;
                     triangle clipped[2];
-                    nClippedTriangles = Triangle_ClipAgainstPlane((vec3d){ 0.0f, 0.0f, 0.1f }, (vec3d){ 0.0f, 0.0f, 1.0f }, &triViewd, &clipped[0], &clipped[1]);
+                    nClippedTriangles = Triangle_ClipAgainstPlane((vec3d){ 0.0f, 0.0f, 0.1f, 1.0f }, (vec3d){ 0.0f, 0.0f, 1.0f, 1.0f }, &triViewd, &clipped[0], &clipped[1]);
                     for (int n = 0; n < nClippedTriangles; n++)
 				{
                     MultiplyMatrixVector(&clipped->p[0], &triProjected.p[0], &matProj);
